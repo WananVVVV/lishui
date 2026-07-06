@@ -1,0 +1,33 @@
+{
+  "name": "city-safety-admin-front",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "vue-tsc -b && vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "typecheck": "vue-tsc -b"
+  },
+  "dependencies": {
+    "@element-plus/icons-vue": "^2.3.1",
+    "element-plus": "^2.8.4",
+    "normalize.css": "^8.0.1",
+    "pinia": "^2.2.4",
+    "vue": "^3.5.11",
+    "vue-router": "^4.4.5"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.1.4",
+    "sass": "1.67.0",
+    "typescript": "^5.5.4",
+    "unplugin-auto-import": "^0.18.3",
+    "unplugin-vue-components": "^0.27.4",
+    "vite": "^5.4.8",
+    "vue-tsc": "^2.1.6"
+  },
+  "engines": {
+    "node": ">=18.x",
+    "pnpm": ">=9.x"
+  }
+}
