@@ -7,6 +7,10 @@ import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 
 export default defineConfig(({ mode }: ConfigEnv): UserConfig => {
   const env = loadEnv(mode, process.cwd())
+  const tagMatcherProxyPrefix =
+    env.VITE_TAG_MATCHER_PROXY_PREFIX || '/tagmatcher-api'
+  const tagMatcherProxyTarget =
+    env.VITE_TAG_MATCHER_PROXY_TARGET || 'http://192.168.2.138:8001'
 
   return {
     base: env.VITE_APP_CONTEXT_PATH,
@@ -44,6 +48,13 @@ export default defineConfig(({ mode }: ConfigEnv): UserConfig => {
           target: 'http://empower-dev.tech.skytech.io',
           changeOrigin: true,
           ws: true,
+        },
+        [tagMatcherProxyPrefix]: {
+          target: tagMatcherProxyTarget,
+          changeOrigin: true,
+          ws: true,
+          rewrite: (path) =>
+            path.replace(new RegExp('^' + tagMatcherProxyPrefix), ''),
         },
       },
     },

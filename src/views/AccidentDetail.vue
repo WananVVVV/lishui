@@ -270,18 +270,40 @@
           <span class="header-icon success">查</span>
           <div class="header-title">
             <h2>隐患排查表智能生成</h2>
-            <p>等待真实数据接口返回检查事项</p>
+            <p>
+              {{
+                hazardChecklistItems.length
+                  ? `已生成 ${hazardChecklistItems.length} 项检查事项`
+                  : "等待真实数据接口返回检查事项"
+              }}
+            </p>
           </div>
         </header>
         <div class="stage-body">
+          <div v-if="hazardAnalyzeError" class="error-box">
+            {{ hazardAnalyzeError }}
+          </div>
           <div v-if="isAnalyzingHazards" class="structured-loading">
             <span class="loading-ring"></span>
             <strong>正在生成隐患排查表</strong>
             <p>系统正在调用隐患分析接口，完成后将展示智能生成的检查事项。</p>
           </div>
+          <div v-else-if="hazardChecklistItems.length" class="hazard-checklist">
+            <div
+              v-for="item in hazardChecklistItems"
+              :key="`${item.index}-${item.labelName}`"
+              class="hazard-check-item"
+            >
+              <span class="hazard-check-index">{{ item.index }}</span>
+              <div class="hazard-check-content">
+                <p>{{ item.labelName }}</p>
+                <strong v-if="item.sourceBasis">{{ item.sourceBasis }}</strong>
+              </div>
+            </div>
+          </div>
           <div v-else class="empty-state">
             <strong>暂无隐患排查项</strong>
-            <p>后续接入真实数据接口后，这里会展示智能生成的检查事项。</p>
+            <p>完成研判报告生成后，这里会展示智能生成的检查事项。</p>
           </div>
         </div>
       </section>
@@ -316,6 +338,7 @@
       </section>
     </aside>
 
+    <!-- 底部操作区暂时不用，保留原代码便于后续恢复。
     <footer class="bottom-actions">
       <el-button
         type="success"
@@ -334,6 +357,7 @@
         {{ issued ? "已下发专项任务" : "下发专项任务" }}
       </el-button>
     </footer>
+    -->
   </div>
 </template>
 
@@ -435,6 +459,12 @@ type EnterpriseMatchResult = {
   note: string;
 };
 
+type HazardChecklistItem = {
+  index: string;
+  labelName: string;
+  sourceBasis: string;
+};
+
 type ReportStepDisplayState = ReportStepState & {
   fieldExtraction?: AccidentFieldExtraction;
   enterpriseMatch?: EnterpriseMatchResult;
@@ -495,6 +525,8 @@ const reportSteps = ref<ReportStepState[]>(createReportSteps());
 const isGenerating = ref(false);
 const isAnalyzingHazards = ref(false);
 const isFinalReportStreaming = ref(false);
+const hazardChecklistItems = ref<HazardChecklistItem[]>([]);
+const hazardAnalyzeError = ref("");
 const chatText = ref("");
 const messageBox = ref<HTMLElement>();
 const streamError = ref("");
@@ -769,6 +801,74 @@ const toTextList = (value: unknown) => {
   if (!Array.isArray(value)) return [];
 
   return value.map((item) => toText(item)).filter(Boolean);
+};
+
+const getFirstExistingValue = (
+  source: Record<string, unknown>,
+  keys: string[],
+) => {
+  for (const key of keys) {
+    if (Object.prototype.hasOwnProperty.call(source, key)) return source[key];
+  }
+
+  return undefined;
+};
+
+const getHazardResultSource = (response: unknown): unknown => {
+  if (Array.isArray(response)) return response;
+
+  const data = toRecord(response);
+  const directResult = getFirstExistingValue(data, [
+    "results",
+    "文本一",
+    "文本1",
+    "text1",
+    "text_one",
+  ]);
+
+  if (directResult !== undefined) return directResult;
+
+  const nestedData = getFirstExistingValue(data, ["data", "result"]);
+  if (nestedData !== undefined && nestedData !== response) {
+    return getHazardResultSource(nestedData);
+  }
+
+  return [];
+};
+
+const parseHazardChecklistItems = (response: unknown): HazardChecklistItem[] => {
+  const source = getHazardResultSource(response);
+  const list = Array.isArray(source) ? source : source ? [source] : [];
+
+  return list
+    .map((item, index) => {
+      const record = toRecord(item);
+      const labelName =
+        toText(
+          getFirstExistingValue(record, [
+            "label_name",
+            "labelName",
+            "检查事项",
+            "隐患排查项",
+            "文本",
+          ]),
+        ) || toText(item);
+      const sourceBasis = toText(
+        getFirstExistingValue(record, [
+          "source_basis",
+          "sourceBasis",
+          "依据",
+          "法规依据",
+        ]),
+      );
+
+      return {
+        index: String(index + 1).padStart(2, "0"),
+        labelName,
+        sourceBasis,
+      };
+    })
+    .filter((item) => item.labelName);
 };
 
 const createFieldItems = (
@@ -1125,11 +1225,16 @@ const analyzeFinalReportHazards = async () => {
 
   const reportContentBase64 = encodeReportContentToBase64(reportContent);
 
+  hazardChecklistItems.value = [];
+  hazardAnalyzeError.value = "";
   isAnalyzingHazards.value = true;
   try {
-    await analyzeCompanyReport(reportContentBase64);
+    const response = await analyzeCompanyReport(reportContentBase64);
+    hazardChecklistItems.value = parseHazardChecklistItems(response);
   } catch (error) {
     console.error("[tag-matcher] analyze failed", error);
+    hazardAnalyzeError.value =
+      error instanceof Error ? error.message : "隐患分析接口调用失败";
   } finally {
     isAnalyzingHazards.value = false;
   }
@@ -1141,6 +1246,8 @@ const resetReportState = () => {
   localStorage.setItem(sessionStorageKey, sessionId.value);
   reportSteps.value = createReportSteps();
   streamError.value = "";
+  hazardChecklistItems.value = [];
+  hazardAnalyzeError.value = "";
   isAnalyzingHazards.value = false;
   isFinalReportStreaming.value = false;
   lastChunkStep = "";
@@ -1158,6 +1265,8 @@ const runAgent = async (message: string, initial: boolean) => {
     resetReportState();
   } else {
     streamError.value = "";
+    hazardChecklistItems.value = [];
+    hazardAnalyzeError.value = "";
     isAnalyzingHazards.value = false;
     isFinalReportStreaming.value = false;
     lastChunkStep = "";
@@ -1251,7 +1360,7 @@ onBeforeUnmount(() => {
       360px,
       480px
     );
-  grid-template-rows: minmax(0, 1fr) 60px;
+  grid-template-rows: minmax(0, 1fr);
   gap: 12px;
   height: 100%;
   min-height: 0;
@@ -2006,6 +2115,60 @@ onBeforeUnmount(() => {
   background: #fffbeb;
   border: 1px solid #fef3c7;
   border-radius: 8px;
+}
+
+.hazard-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.hazard-check-item {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 10px;
+  padding: 12px;
+  background: #fff;
+  border: 1px solid $border-light;
+  border-left: 3px solid $success;
+  border-radius: 8px;
+}
+
+.hazard-check-index {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  color: #15803d;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.hazard-check-content {
+  min-width: 0;
+
+  p {
+    margin: 0;
+    color: $ink;
+    font-size: 13px;
+    line-height: 1.7;
+    word-break: break-word;
+  }
+
+  strong {
+    display: block;
+    margin-top: 8px;
+    color: $ink-muted;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.5;
+    word-break: break-word;
+  }
 }
 
 .final-content {
