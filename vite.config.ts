@@ -7,14 +7,9 @@ import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 
 export default defineConfig(({ mode }: ConfigEnv): UserConfig => {
   const env = loadEnv(mode, process.cwd())
-  const base = env.VITE_APP_BASE_URL || '/'
-  const apiBase = env.VITE_APP_API_BASE || '/api'
-  const server = env.VITE_APP_SERVER
-  const tagMatcherServer = env.VITE_TAG_MATCHER_SERVER
-  const analogyRiskAgentServer = env.VITE_ANALOGY_RISK_AGENT_SERVER
 
   return {
-    base,
+    base: env.VITE_APP_CONTEXT_PATH,
     plugins: [
       vue(),
       AutoImport({
@@ -34,39 +29,44 @@ export default defineConfig(({ mode }: ConfigEnv): UserConfig => {
     },
     server: {
       host: '0.0.0.0',
-      port: 5173,
+      port: Number(env.VITE_APP_PORT),
+      open: false,
       proxy: {
-        ...(server
-          ? {
-              [apiBase]: {
-                target: server,
-                changeOrigin: true,
-              },
-            }
-          : {}),
-        ...(tagMatcherServer
-          ? {
-              '/yyg-tagmatcher': {
-                target: tagMatcherServer,
-                changeOrigin: true,
-              },
-            }
-          : {}),
-        ...(analogyRiskAgentServer
-          ? {
-              '/agent': {
-                target: analogyRiskAgentServer,
-                changeOrigin: true,
-              },
-            }
-          : {}),
+        [env.VITE_APP_BASE_API]: {
+          target: 'http://empower-dev.tech.skytech.io/se/yyg-aqjc-api',
+          // target: 'http://192.168.2.182:10020/se/yyg-aqjc-api',
+          changeOrigin: true,
+          ws: true,
+          rewrite: (path) =>
+            path.replace(new RegExp('^' + env.VITE_APP_BASE_API), ''),
+        },
+        '/agent': {
+          target: 'http://empower-dev.tech.skytech.io',
+          changeOrigin: true,
+          ws: true,
+        },
       },
     },
     build: {
-      outDir: 'dist',
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes('node_modules')) {
+              return 'lib'
+            }
+          },
+        },
+      },
+      terserOptions: {
+        compress: {
+          drop_debugger: true,
+        },
+      },
+      outDir: 'dist/city-safety-admin-front',
       emptyOutDir: true,
       cssCodeSplit: false,
       chunkSizeWarningLimit: 1000,
+      target: 'es2022',
     },
     css: {
       preprocessorOptions: {

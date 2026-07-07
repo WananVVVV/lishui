@@ -1,31 +1,9 @@
 const TAG_MATCHER_ANALYZE_URL = import.meta.env.VITE_TAG_MATCHER_ANALYZE_URL
-const TAG_MATCHER_REQUEST_URL = `${import.meta.env.BASE_URL}documents/tagmatcher-request.txt`
 
 export type TagMatcherAnalyzePayload = {
   tasktype: '1'
   report_content: string
   filter_ids: []
-}
-
-const extractReportContent = (requestText: string) => {
-  const match = requestText.match(/"report_content"\s*:\s*"([^"]+)"/)
-  const reportContent = match?.[1]?.trim()
-
-  if (!reportContent) {
-    throw new Error('未在 tagmatcher-request.txt 中找到 report_content')
-  }
-
-  return reportContent
-}
-
-export const loadCompanyReportBase64 = async () => {
-  const response = await fetch(TAG_MATCHER_REQUEST_URL)
-
-  if (!response.ok) {
-    throw new Error(`隐患分析请求文本读取失败：${response.status}`)
-  }
-
-  return extractReportContent(await response.text())
 }
 
 export const encodeReportContentToBase64 = (content: string) => {
@@ -41,13 +19,16 @@ export const encodeReportContentToBase64 = (content: string) => {
   return btoa(binary)
 }
 
-export const analyzeCompanyReport = async (reportContent?: string) => {
+export const analyzeCompanyReport = async (reportContent: string) => {
   if (!TAG_MATCHER_ANALYZE_URL) {
     throw new Error('请配置 VITE_TAG_MATCHER_ANALYZE_URL')
   }
 
-  const encodedReportContent =
-    reportContent ?? (await loadCompanyReportBase64())
+  const encodedReportContent = reportContent.trim()
+  if (!encodedReportContent) {
+    throw new Error('隐患分析接口缺少 report_content')
+  }
+
   const payload: TagMatcherAnalyzePayload = {
     tasktype: '1',
     report_content: encodedReportContent,

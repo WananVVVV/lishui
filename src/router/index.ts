@@ -1,7 +1,8 @@
-import { createRouter, createWebHashHistory, type RouteRecordRaw } from 'vue-router'
+import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import { accidents } from '@/data/accidents'
 
 const appTitle = import.meta.env.VITE_APP_TITLE || '溧水区城市安全电子一张图'
+const appBase = import.meta.env.VITE_APP_CONTEXT_PATH || import.meta.env.BASE_URL || '/'
 
 const routes: RouteRecordRaw[] = [
   {
@@ -23,7 +24,7 @@ const routes: RouteRecordRaw[] = [
 ]
 
 const router = createRouter({
-  history: createWebHashHistory(),
+  history: createWebHistory(appBase),
   routes,
 })
 
