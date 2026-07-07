@@ -7,10 +7,7 @@
         </el-form-item>
         <el-form-item label="事故来源">
           <el-select v-model="filters.source" placeholder="全部" clearable>
-            <el-option label="国家应急管理部" value="国家应急管理部" />
-            <el-option label="江苏省应急管理厅" value="江苏省应急管理厅" />
-            <el-option label="南京市应急管理局" value="南京市应急管理局" />
-            <el-option label="其他省级部门" value="其他省级部门" />
+            <el-option v-for="source in sourceOptions" :key="source" :label="source" :value="source" />
           </el-select>
         </el-form-item>
         <el-form-item label="是否生成类比排查方案">
@@ -64,7 +61,7 @@
         </el-table-column>
         <el-table-column label="操作" width="130" fixed="right">
           <template #default="{ row }">
-            <el-button size="small" type="primary" plain @click="openDetail(row.id)">查看</el-button>
+            <el-button size="small" type="primary" plain @click="openDetail(row.fileId)">查看</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -111,6 +108,10 @@ const mergedData = computed<AccidentRow[]>(() => {
   }))
 })
 
+const sourceOptions = computed(() => {
+  return Array.from(new Set(mergedData.value.map((item) => item.source)))
+})
+
 const filteredData = computed(() => {
   return mergedData.value.filter((item) => {
     if (filters.name && !item.name.includes(filters.name)) return false
@@ -139,8 +140,8 @@ const resetFilters = () => {
   currentPage.value = 1
 }
 
-const openDetail = (id: number) => {
-  router.push(`/accidents/${id}`)
+const openDetail = (fileId: string) => {
+  router.push(`/accidents/${fileId}`)
 }
 </script>
 

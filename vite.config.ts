@@ -10,6 +10,8 @@ export default defineConfig(({ mode }: ConfigEnv): UserConfig => {
   const base = env.VITE_APP_BASE_URL || '/'
   const apiBase = env.VITE_APP_API_BASE || '/api'
   const server = env.VITE_APP_SERVER
+  const tagMatcherServer = env.VITE_TAG_MATCHER_SERVER
+  const analogyRiskAgentServer = env.VITE_ANALOGY_RISK_AGENT_SERVER
 
   return {
     base,
@@ -33,14 +35,32 @@ export default defineConfig(({ mode }: ConfigEnv): UserConfig => {
     server: {
       host: '0.0.0.0',
       port: 5173,
-      proxy: server
-        ? {
-            [apiBase]: {
-              target: server,
-              changeOrigin: true,
-            },
-          }
-        : undefined,
+      proxy: {
+        ...(server
+          ? {
+              [apiBase]: {
+                target: server,
+                changeOrigin: true,
+              },
+            }
+          : {}),
+        ...(tagMatcherServer
+          ? {
+              '/yyg-tagmatcher': {
+                target: tagMatcherServer,
+                changeOrigin: true,
+              },
+            }
+          : {}),
+        ...(analogyRiskAgentServer
+          ? {
+              '/agent': {
+                target: analogyRiskAgentServer,
+                changeOrigin: true,
+              },
+            }
+          : {}),
+      },
     },
     build: {
       outDir: 'dist',

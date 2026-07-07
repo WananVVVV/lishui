@@ -1,6 +1,6 @@
 <template>
   <AdminShell>
-    <router-view />
+    <router-view :key="$route.fullPath" />
   </AdminShell>
 </template>
 
