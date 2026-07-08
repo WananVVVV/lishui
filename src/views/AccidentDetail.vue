@@ -265,6 +265,35 @@
     </main>
 
     <aside class="right-grid">
+      <section class="stage-card page-card final-card">
+        <header class="stage-header">
+          <span class="header-icon">{{ finalStep.index }}</span>
+          <div class="header-title">
+            <h2>{{ finalStep.title }}</h2>
+            <p>{{ finalStep.description }}</p>
+          </div>
+        </header>
+        <div class="stage-body">
+          <div v-if="streamError" class="error-box">{{ streamError }}</div>
+          <div v-if="isFinalReportStreaming" class="structured-loading">
+            <span class="loading-ring"></span>
+            <strong>正在整合总稿</strong>
+            <p>
+              智能体正在汇总事故字段和企业匹配结果，完成后将展示完整研判报告。
+            </p>
+          </div>
+          <div
+            v-else-if="finalStep.content"
+            class="markdown-content final-content"
+            v-html="renderFinalReportMarkdown(finalStep.content)"
+          ></div>
+          <div v-else class="empty-state">
+            <strong>暂无总稿内容</strong>
+            <p>点击左侧按钮后，最终研判报告会在这里实时追加。</p>
+          </div>
+        </div>
+      </section>
+
       <section class="stage-card page-card checklist-card">
         <header class="stage-header">
           <span class="header-icon success">查</span>
@@ -304,35 +333,6 @@
           <div v-else class="empty-state">
             <strong>暂无隐患排查项</strong>
             <p>完成研判报告生成后，这里会展示智能生成的检查事项。</p>
-          </div>
-        </div>
-      </section>
-
-      <section class="stage-card page-card final-card">
-        <header class="stage-header">
-          <span class="header-icon">{{ finalStep.index }}</span>
-          <div class="header-title">
-            <h2>{{ finalStep.title }}</h2>
-            <p>{{ finalStep.description }}</p>
-          </div>
-        </header>
-        <div class="stage-body">
-          <div v-if="streamError" class="error-box">{{ streamError }}</div>
-          <div v-if="isFinalReportStreaming" class="structured-loading">
-            <span class="loading-ring"></span>
-            <strong>正在整合总稿</strong>
-            <p>
-              智能体正在汇总事故字段和企业匹配结果，完成后将展示完整研判报告。
-            </p>
-          </div>
-          <div
-            v-else-if="finalStep.content"
-            class="markdown-content final-content"
-            v-html="renderFinalReportMarkdown(finalStep.content)"
-          ></div>
-          <div v-else class="empty-state">
-            <strong>暂无总稿内容</strong>
-            <p>点击左侧按钮后，最终研判报告会在这里实时追加。</p>
           </div>
         </div>
       </section>
@@ -1066,17 +1066,38 @@ const parseEnterpriseMatchResult = (
   const serviceStatus = getMarkdownBulletValue(content, "服务调用状态");
   const totalMatched = getMarkdownBulletValue(content, [
     "总匹配企业数（total_matched）",
+    "总匹配企业数 (total_matched)",
     "满足召回条件的企业总数（total_matched）",
+    "满足召回条件的企业总数 (total_matched)",
   ]);
   const returnedCount = getMarkdownBulletValue(content, "本次返回候选数");
+  const countCandidatesByRiskClass = (
+    riskClass: EnterpriseCandidate["riskClass"],
+  ) => `${candidates.filter((item) => item.riskClass === riskClass).length} 家`;
   const highCount =
-    getMarkdownBulletValue(content, ["high 档", "高风险（high）企业"]) ||
-    "0 家";
+    getMarkdownBulletValue(content, [
+      "high 档",
+      "高风险（high）企业",
+      "高风险（high）",
+      "高风险 (high)",
+      "高风险(high)",
+    ]) || countCandidatesByRiskClass("high");
   const mediumCount =
-    getMarkdownBulletValue(content, ["medium 档", "中风险（medium）企业"]) ||
-    "0 家";
+    getMarkdownBulletValue(content, [
+      "medium 档",
+      "中风险（medium）企业",
+      "中风险（medium）",
+      "中风险 (medium)",
+      "中风险(medium)",
+    ]) || countCandidatesByRiskClass("medium");
   const lowCount =
-    getMarkdownBulletValue(content, ["low 档", "低风险（low）企业"]) || "0 家";
+    getMarkdownBulletValue(content, [
+      "low 档",
+      "低风险（low）企业",
+      "低风险（low）",
+      "低风险 (low)",
+      "低风险(low)",
+    ]) || countCandidatesByRiskClass("low");
   const checkResultMatch = content.match(/\*\*核对结果\*\*[：:]\s*([^\n]+)/);
   const noteMatch =
     content.match(/>\s*\*\*(本结果.+?)\*\*/) ||
@@ -1104,12 +1125,6 @@ const parseEnterpriseMatchResult = (
       {
         label: "本次返回候选数",
         value: returnedCount || String(candidates.length),
-      },
-      {
-        label: "去重后企业数",
-        value: String(
-          new Set(candidates.map((item) => item.enterpriseId)).size,
-        ),
       },
     ],
     riskCounts: [
@@ -1931,6 +1946,10 @@ onBeforeUnmount(() => {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
+}
+
+.match-stats {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .match-stat,
