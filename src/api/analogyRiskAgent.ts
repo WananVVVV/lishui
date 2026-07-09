@@ -143,21 +143,22 @@ const parseSseLine = (
   onChunk: (chunk: AnalogyRiskStreamChunk) => void,
 ) => {
   if (!line.startsWith('data:')) {
-    return
+    return undefined
   }
 
   const data = line.slice(5).trim()
-  if (!data || data === '[DONE]') return
+  if (!data || data === '[DONE]') return undefined
 
   let chunk: AnalogyRiskStreamChunk
   try {
     chunk = JSON.parse(data) as AnalogyRiskStreamChunk
   } catch (error) {
     console.warn('analogy-risk-agent SSE chunk parse failed', error)
-    return
+    return undefined
   }
 
   onChunk(chunk)
+  return chunk
 }
 
 export const streamAnalogyRiskAgent = async ({
@@ -194,6 +195,13 @@ export const streamAnalogyRiskAgent = async ({
   const reader = response.body.getReader()
   const decoder = new TextDecoder()
   let buffer = ''
+  let aggregatedContent = ''
+  const processLine = (line: string) => {
+    const chunk = parseSseLine(line, onChunk)
+    if (chunk) {
+      aggregatedContent += getAnalogyRiskChunkContent(chunk)
+    }
+  }
 
   while (true) {
     const { done, value } = await reader.read()
@@ -203,11 +211,13 @@ export const streamAnalogyRiskAgent = async ({
     const lines = buffer.split(/\r?\n/)
     buffer = lines.pop() ?? ''
 
-    lines.forEach((line) => parseSseLine(line, onChunk))
+    lines.forEach(processLine)
   }
 
   buffer += decoder.decode()
   if (buffer) {
-    buffer.split(/\r?\n/).forEach((line) => parseSseLine(line, onChunk))
+    buffer.split(/\r?\n/).forEach(processLine)
   }
+
+  console.log('[analogy-risk-agent] completions stream aggregated content:', aggregatedContent)
 }

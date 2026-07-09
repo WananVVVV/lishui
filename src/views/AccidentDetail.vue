@@ -79,14 +79,6 @@
         </header>
         <div class="stage-body">
           <div v-if="step.fieldExtraction" class="field-extraction">
-            <div class="field-hero">
-              <span>事故名称</span>
-              <strong>{{ step.fieldExtraction.accidentName }}</strong>
-              <p v-if="step.fieldExtraction.confirmText">
-                {{ step.fieldExtraction.confirmText }}
-              </p>
-            </div>
-
             <section class="field-section">
               <h3>明确提取</h3>
               <div class="field-grid">
@@ -138,46 +130,6 @@
             </section>
           </div>
           <div v-else-if="step.enterpriseMatch" class="enterprise-match">
-            <div class="match-hero">
-              <div>
-                <span>匹配结果</span>
-                <strong>{{ step.enterpriseMatch.title }}</strong>
-                <p v-if="step.enterpriseMatch.confirmText">
-                  {{ step.enterpriseMatch.confirmText }}
-                </p>
-              </div>
-              <b
-                :class="[
-                  'service-status',
-                  step.enterpriseMatch.serviceOk ? 'ok' : 'warn',
-                ]"
-              >
-                {{ step.enterpriseMatch.serviceStatus || "未知状态" }}
-              </b>
-            </div>
-
-            <div class="match-stats">
-              <div
-                v-for="item in step.enterpriseMatch.summaryItems"
-                :key="item.label"
-                class="match-stat"
-              >
-                <span>{{ item.label }}</span>
-                <strong>{{ item.value }}</strong>
-              </div>
-            </div>
-
-            <div class="risk-distribution">
-              <div
-                v-for="item in step.enterpriseMatch.riskCounts"
-                :key="item.key"
-                :class="['risk-count', item.key]"
-              >
-                <span>{{ item.label }}</span>
-                <strong>{{ item.value }}</strong>
-              </div>
-            </div>
-
             <section class="match-section">
               <div class="match-section-title">
                 <h3>候选企业清单</h3>
@@ -216,35 +168,6 @@
                 </table>
               </div>
             </section>
-
-            <section
-              v-if="
-                step.enterpriseMatch.checkItems.length ||
-                step.enterpriseMatch.checkResult
-              "
-              class="match-section"
-            >
-              <div class="match-section-title">
-                <h3>候选输出核对</h3>
-              </div>
-              <div class="check-grid">
-                <div
-                  v-for="item in step.enterpriseMatch.checkItems"
-                  :key="item.label"
-                  class="check-item"
-                >
-                  <span>{{ item.label }}</span>
-                  <strong>{{ item.value }}</strong>
-                </div>
-              </div>
-              <p v-if="step.enterpriseMatch.checkResult" class="check-result">
-                {{ step.enterpriseMatch.checkResult }}
-              </p>
-            </section>
-
-            <p v-if="step.enterpriseMatch.note" class="match-note">
-              {{ step.enterpriseMatch.note }}
-            </p>
           </div>
           <div v-else-if="step.isStructuredLoading" class="structured-loading">
             <span class="loading-ring"></span>
@@ -419,21 +342,8 @@ type FieldDisplayItem = {
 };
 
 type AccidentFieldExtraction = {
-  accidentName: string;
-  confirmText: string;
   explicitItems: FieldDisplayItem[];
   inferredItems: FieldDisplayItem[];
-};
-
-type MatchSummaryItem = {
-  label: string;
-  value: string;
-};
-
-type RiskCountItem = {
-  key: "high" | "medium" | "low";
-  label: string;
-  value: string;
 };
 
 type EnterpriseCandidate = {
@@ -447,16 +357,7 @@ type EnterpriseCandidate = {
 };
 
 type EnterpriseMatchResult = {
-  title: string;
-  confirmText: string;
-  serviceStatus: string;
-  serviceOk: boolean;
-  summaryItems: MatchSummaryItem[];
-  riskCounts: RiskCountItem[];
   candidates: EnterpriseCandidate[];
-  checkItems: MatchSummaryItem[];
-  checkResult: string;
-  note: string;
 };
 
 type HazardChecklistItem = {
@@ -912,14 +813,7 @@ const parseAccidentFieldExtraction = (
     >;
     const explicit = toRecord(data["明确提取"]);
     const inferred = toRecord(data["推断内容"]);
-    const confirmText = content
-      .slice(end + 1)
-      .replace(/```/g, "")
-      .trim();
-
     return {
-      accidentName: toText(data["事故名称"]) || "未命名事故",
-      confirmText,
       explicitItems: createFieldItems(
         explicit,
         [
@@ -957,26 +851,6 @@ const stripMarkdown = (value: string) => {
     .replace(/`/g, "")
     .replace(/^>\s*/, "")
     .trim();
-};
-
-const escapeRegExp = (value: string) => {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-};
-
-const getMarkdownBulletValue = (content: string, labels: string | string[]) => {
-  const labelList = Array.isArray(labels) ? labels : [labels];
-  const lines = content.split(/\r?\n/).map(stripMarkdown);
-
-  for (const label of labelList) {
-    const labelRegExp = new RegExp(
-      `^(?:-\\s*)?${escapeRegExp(label)}\\s*[：:]\\s*(.+)$`,
-    );
-    const line = lines.find((item) => labelRegExp.test(item));
-
-    if (line) return line.match(labelRegExp)?.[1]?.trim() || "";
-  }
-
-  return "";
 };
 
 const splitMarkdownTableRow = (line: string) => {
@@ -1033,26 +907,6 @@ const parseCandidateRows = (content: string): EnterpriseCandidate[] => {
     });
 };
 
-const parseCheckRows = (content: string): MatchSummaryItem[] => {
-  const checkStart = content.indexOf("候选输出核对");
-  if (checkStart < 0) return [];
-
-  const isDividerCell = (value: string) => /^:?-+:?$/.test(value);
-
-  return content
-    .slice(checkStart)
-    .split(/\r?\n/)
-    .filter((line) => /^\|\s*[^|]+\s*\|\s*[^|]+\s*\|/.test(line))
-    .map(splitMarkdownTableRow)
-    .filter(([label, value]) => {
-      if (!label || !value) return false;
-      return (
-        label !== "核对项" && !isDividerCell(label) && !isDividerCell(value)
-      );
-    })
-    .map(([label, value]) => ({ label, value }));
-};
-
 const parseEnterpriseMatchResult = (
   content: string,
 ): EnterpriseMatchResult | undefined => {
@@ -1063,79 +917,8 @@ const parseEnterpriseMatchResult = (
   const candidates = parseCandidateRows(content);
   if (!candidates.length) return undefined;
 
-  const serviceStatus = getMarkdownBulletValue(content, "服务调用状态");
-  const totalMatched = getMarkdownBulletValue(content, [
-    "总匹配企业数（total_matched）",
-    "总匹配企业数 (total_matched)",
-    "满足召回条件的企业总数（total_matched）",
-    "满足召回条件的企业总数 (total_matched)",
-  ]);
-  const returnedCount = getMarkdownBulletValue(content, "本次返回候选数");
-  const countCandidatesByRiskClass = (
-    riskClass: EnterpriseCandidate["riskClass"],
-  ) => `${candidates.filter((item) => item.riskClass === riskClass).length} 家`;
-  const highCount =
-    getMarkdownBulletValue(content, [
-      "high 档",
-      "高风险（high）企业",
-      "高风险（high）",
-      "高风险 (high)",
-      "高风险(high)",
-    ]) || countCandidatesByRiskClass("high");
-  const mediumCount =
-    getMarkdownBulletValue(content, [
-      "medium 档",
-      "中风险（medium）企业",
-      "中风险（medium）",
-      "中风险 (medium)",
-      "中风险(medium)",
-    ]) || countCandidatesByRiskClass("medium");
-  const lowCount =
-    getMarkdownBulletValue(content, [
-      "low 档",
-      "低风险（low）企业",
-      "低风险（low）",
-      "低风险 (low)",
-      "低风险(low)",
-    ]) || countCandidatesByRiskClass("low");
-  const checkResultMatch = content.match(/\*\*核对结果\*\*[：:]\s*([^\n]+)/);
-  const noteMatch =
-    content.match(/>\s*\*\*(本结果.+?)\*\*/) ||
-    content.match(/\*\*(本结果.+?)\*\*/);
-  const lastDividerIndex = content.lastIndexOf("---");
-  const confirmSource =
-    lastDividerIndex >= 0 ? content.slice(lastDividerIndex + 3) : content;
-  const confirmText = confirmSource
-    .replace(/>\s*\*\*.+?\*\*/g, "")
-    .trim()
-    .split(/\r?\n/)
-    .find((line) => line.includes("企业匹配结果已展示"));
-
   return {
-    title: "同类风险企业匹配结果",
-    confirmText: stripMarkdown(confirmText || ""),
-    serviceStatus,
-    serviceOk:
-      serviceStatus.includes("成功") || serviceStatus.includes("success=true"),
-    summaryItems: [
-      {
-        label: "总匹配企业数",
-        value: totalMatched || String(candidates.length),
-      },
-      {
-        label: "本次返回候选数",
-        value: returnedCount || String(candidates.length),
-      },
-    ],
-    riskCounts: [
-      { key: "high", label: "高风险", value: highCount },
-      { key: "medium", label: "中风险", value: mediumCount },
-      { key: "low", label: "低风险", value: lowCount },
-    ],
     candidates,
-    checkItems: parseCheckRows(content),
-    checkResult: stripMarkdown(checkResultMatch?.[1] || ""),
-    note: stripMarkdown(noteMatch?.[1] || ""),
   };
 };
 
@@ -1753,35 +1536,6 @@ onBeforeUnmount(() => {
   gap: 14px;
 }
 
-.field-hero {
-  padding: 12px 14px;
-  background: #f8fafc;
-  border: 1px solid $border-light;
-  border-left: 3px solid $brand;
-  border-radius: 8px;
-
-  span {
-    display: block;
-    color: $ink-muted;
-    font-size: 12px;
-  }
-
-  strong {
-    display: block;
-    margin-top: 4px;
-    color: $ink;
-    font-size: 15px;
-    line-height: 1.55;
-  }
-
-  p {
-    margin: 8px 0 0;
-    color: $ink-muted;
-    font-size: 12px;
-    line-height: 1.6;
-  }
-}
-
 .field-section {
   h3 {
     display: flex;
@@ -1886,121 +1640,6 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: 12px;
-}
-
-.match-hero {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 12px 14px;
-  background: #f8fafc;
-  border: 1px solid $border-light;
-  border-left: 3px solid $brand;
-  border-radius: 8px;
-
-  span {
-    display: block;
-    color: $ink-muted;
-    font-size: 12px;
-  }
-
-  strong {
-    display: block;
-    margin-top: 4px;
-    color: $ink;
-    font-size: 15px;
-  }
-
-  p {
-    margin: 8px 0 0;
-    color: $ink-muted;
-    font-size: 12px;
-    line-height: 1.6;
-  }
-}
-
-.service-status {
-  flex-shrink: 0;
-  padding: 3px 8px;
-  border-radius: 6px;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.service-status.ok {
-  color: #15803d;
-  background: #f0fdf4;
-  border: 1px solid #bbf7d0;
-}
-
-.service-status.warn {
-  color: #c2410c;
-  background: #fff7ed;
-  border: 1px solid #fed7aa;
-}
-
-.match-stats,
-.risk-distribution,
-.check-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.match-stats {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.match-stat,
-.risk-count,
-.check-item {
-  min-width: 0;
-  padding: 10px 12px;
-  background: #fff;
-  border: 1px solid $border-light;
-  border-radius: 8px;
-
-  span {
-    display: block;
-    color: $ink-muted;
-    font-size: 12px;
-  }
-
-  strong {
-    display: block;
-    margin-top: 4px;
-    color: $ink;
-    font-size: 15px;
-    word-break: break-word;
-  }
-}
-
-.risk-count.high {
-  background: #fef2f2;
-  border-color: #fecaca;
-
-  strong {
-    color: $danger;
-  }
-}
-
-.risk-count.medium {
-  background: #fff7ed;
-  border-color: #fed7aa;
-
-  strong {
-    color: #c2410c;
-  }
-}
-
-.risk-count.low {
-  background: #f0fdf4;
-  border-color: #bbf7d0;
-
-  strong {
-    color: #15803d;
-  }
 }
 
 .match-section {
@@ -2119,21 +1758,6 @@ onBeforeUnmount(() => {
 .risk-pill.low {
   color: #15803d;
   background: #f0fdf4;
-}
-
-.check-result,
-.match-note {
-  margin: 10px 0 0;
-  color: $ink-muted;
-  font-size: 12px;
-  line-height: 1.6;
-}
-
-.match-note {
-  padding: 10px 12px;
-  background: #fffbeb;
-  border: 1px solid #fef3c7;
-  border-radius: 8px;
 }
 
 .hazard-checklist {
